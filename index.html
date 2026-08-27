@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>김강현 — 3D 애니메이션</title>
+
+<!-- ─────────────────────────────────────────────────────────────
+     폰트: Archivo(타이틀), IBM Plex Sans(본문), IBM Plex Mono(타임코드)
+     ───────────────────────────────────────────────────────────── -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#151929;          /* 그레이딩된 다크 베이스 (차가운 그림자) */
+  --panel:#100727;       /* 카드/패널 표면 */
+  --panel-2:#232733;
+  --line:#393d49;        /* 헤어라인 */
+  --ink:#ECEEF4;         /* 본문 텍스트 */
+  --mut:#939aac;         /* 보조 텍스트 */
+  --key:#7be73c;         /* 키프레임 앰버 (따뜻한 시그널 컬러) */
+  --key-soft:rgba(231,161,60,.14);
+  --focus:#5B9DFF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:"IBM Plex Sans",sans-serif;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:inherit;text-decoration:none}
+img,video{max-width:100%;display:block}
+.mono{font-family:"IBM Plex Mono",monospace;letter-spacing:.02em}
+
+/* 레이아웃 */
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+section{padding:96px 0}
+
+/* 섹션 라벨: 타임코드 + 키프레임 마커 (구조가 곧 정보) */
+.eyebrow{
+  display:flex;align-items:center;gap:12px;
+  font-family:"IBM Plex Mono",monospace;font-size:.8rem;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--mut);
+  margin-bottom:36px;
+}
+.eyebrow .tc{color:var(--key)}
+.eyebrow::before{content:"";width:9px;height:9px;background:var(--key);
+  transform:rotate(45deg);flex:none} /* 키프레임 다이아몬드 */
+.eyebrow .rule{flex:1;height:1px;background:var(--line)}
+
+/* ── 상단 컨트롤 바 ── */
+header{
+  position:sticky;top:0;z-index:50;
+  background:rgba(19,21,28,.82);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.bar{display:flex;align-items:center;justify-content:space-between;
+  height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-family:"Archivo",sans-serif;
+  font-weight:800;letter-spacing:.02em}
+.brand .kf{width:11px;height:11px;background:var(--key);transform:rotate(45deg)}
+nav{display:flex;gap:26px;font-family:"IBM Plex Mono",monospace;font-size:.82rem}
+nav a{color:var(--mut);transition:color .2s}
+nav a:hover{color:var(--ink)}
+
+/* ── 히어로 ── */
+.hero{padding:120px 0 84px;position:relative}
+.hero h1{
+  font-family:"Archivo",sans-serif;font-weight:800;
+  font-size:clamp(2.6rem,7vw,5.4rem);line-height:1.02;
+  letter-spacing:-.02em;
+}
+.hero h1 em{font-style:normal;color:var(--key)}
+.hero .role{
+  margin-top:22px;font-family:"IBM Plex Mono",monospace;
+  color:var(--mut);font-size:clamp(.85rem,1.6vw,1rem);letter-spacing:.03em;
+}
+.hero .lede{margin-top:26px;max-width:540px;color:#C3C8D4;font-size:1.08rem}
+
+/* 히어로 타임라인 스크러버 (시그니처 요소) */
+.track{margin-top:48px;position:relative;height:2px;background:var(--line);
+  max-width:640px}
+.track .fill{position:absolute;left:0;top:0;height:100%;background:var(--key);
+  width:38%}
+.track .kf{position:absolute;top:50%;width:11px;height:11px;
+  background:var(--bg);border:2px solid var(--key);transform:translate(-50%,-50%) rotate(45deg)}
+.track .kf.solid{background:var(--key)}
+.track .head{position:absolute;top:50%;transform:translate(-50%,-50%);
+  width:2px;height:22px;background:var(--ink);left:38%}
+.tc-row{display:flex;justify-content:space-between;max-width:640px;
+  margin-top:12px;font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--mut)}
+
+/* ── 작업물 필터 ── */
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:34px}
+.chip{
+  font-family:"IBM Plex Mono",monospace;font-size:.78rem;
+  padding:8px 16px;border:1px solid var(--line);border-radius:2px;
+  background:transparent;color:var(--mut);cursor:pointer;transition:.18s;
+}
+.chip:hover{color:var(--ink);border-color:var(--mut)}
+.chip[aria-pressed="true"]{background:var(--key-soft);color:var(--key);border-color:var(--key)}
+
+/* ── 작업물 그리드 (타임라인 위의 레이어처럼) ── */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:4px;
+  overflow:hidden;cursor:pointer;transition:transform .25s,border-color .25s;
+}
+.card:hover{transform:translateY(-4px);border-color:var(--key)}
+.card:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.thumb{aspect-ratio:16/10;position:relative;display:flex;
+  align-items:flex-end;padding:14px;
+  background:linear-gradient(135deg,#2A2F3D,#1A1D26)}
+/* 카테고리별 썸네일 톤 (실제 이미지로 교체할 자리) */
+.card[data-cat="motion"] .thumb{background:linear-gradient(135deg,#243a4a,#16202b)}
+.card[data-cat="vfx"]    .thumb{background:linear-gradient(135deg,#3a2a44,#1e1826)}
+.card[data-cat="ai"]     .thumb{background:linear-gradient(135deg,#443a24,#231d12)}
+.thumb .play{position:absolute;top:14px;right:14px;width:34px;height:34px;
+  border:1px solid rgba(255,255,255,.35);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;opacity:0;transition:.2s}
+.card:hover .thumb .play{opacity:1}
+.thumb .play::after{content:"";border-left:8px solid #fff;
+  border-top:5px solid transparent;border-bottom:5px solid transparent;margin-left:2px}
+.cat-tag{font-family:"IBM Plex Mono",monospace;font-size:.68rem;
+  letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.85);
+  background:rgba(0,0,0,.35);padding:4px 9px;border-radius:2px}
+.meta{padding:16px 18px 18px}
+.meta h3{font-family:"Archivo",sans-serif;font-weight:600;font-size:1.06rem}
+.meta .sub{margin-top:6px;font-family:"IBM Plex Mono",monospace;
+  font-size:.74rem;color:var(--mut);display:flex;gap:14px}
+
+/* ── ABOUT ── */
+.about{display:grid;grid-template-columns:1.4fr 1fr;gap:56px;align-items:start}
+.about p{color:#C3C8D4;margin-bottom:18px;max-width:56ch}
+.about p strong{color:var(--ink);font-weight:600}
+/* 스펙 패널 (숏 메타데이터 느낌) */
+.spec{background:var(--panel);border:1px solid var(--line);border-radius:4px;
+  padding:8px 22px}
+.spec .row{display:flex;justify-content:space-between;padding:15px 0;
+  border-bottom:1px solid var(--line);font-family:"IBM Plex Mono",monospace;font-size:.82rem}
+.spec .row:last-child{border-bottom:none}
+.spec .row .k{color:var(--mut)}
+.spec .row .v{color:var(--key);text-align:right}
+
+/* ── CONTACT ── */
+.contact h2{font-family:"Archivo",sans-serif;font-weight:800;
+  font-size:clamp(2rem,5vw,3.4rem);letter-spacing:-.02em;line-height:1.05}
+.contact .mail{display:inline-block;margin-top:24px;font-size:1.3rem;
+  border-bottom:2px solid var(--key);padding-bottom:4px;transition:.2s}
+.contact .mail:hover{color:var(--key)}
+.links{display:flex;gap:22px;margin-top:34px;font-family:"IBM Plex Mono",monospace;
+  font-size:.85rem;color:var(--mut);flex-wrap:wrap}
+.links a{transition:.2s}.links a:hover{color:var(--ink)}
+
+footer{border-top:1px solid var(--line);padding:30px 0;
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--mut)}
+.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+/* 진입 애니메이션 (reduced-motion 존중) */
+.reveal{opacity:0;transform:translateY(16px);
+  transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  .reveal{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+}
+
+/* 반응형 */
+@media(max-width:880px){
+  .grid{grid-template-columns:repeat(2,1fr)}
+  .about{grid-template-columns:1fr;gap:34px}
+  nav{display:none}
+  section{padding:72px 0}
+}
+@media(max-width:560px){
+  .grid{grid-template-columns:1fr}
+  .wrap{padding:0 20px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ 컨트롤 바 ══════════ -->
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="#top"><span class="kf"></span>김강현</a>
+    <nav>
+      <a href="#work">WORK</a>
+      <a href="#about">ABOUT</a>
+      <a href="#contact">CONTACT</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ══════════ 히어로 ══════════ -->
+<div id="top"></div>
+<section class="hero wrap reveal">
+  <h1>아름다운<br>변화를 <em>이야기</em>합니다</h1>
+  <p class="role mono">3D Animation · GAME CINEMATIC</p>
+  <p class="lede">움직임을 노래하는 현장에서 이야기를 만들어 나가는 여정 중 입니다.</p>
+
+  <!-- 시그니처: 타임라인 스크러버 -->
+  <div class="track" aria-hidden="true">
+    <div class="fill"></div>
+    <span class="kf solid" style="left:0%"></span>
+    <span class="kf" style="left:38%"></span>
+    <span class="kf" style="left:72%"></span>
+    <span class="kf solid" style="left:100%"></span>
+    <span class="head"></span>
+  </div>
+  <div class="tc-row mono"><span>00:00:00</span><span>01:12:04</span></div>
+</section>
+
+<!-- ══════════ 작업물 ══════════ -->
+<section id="work" class="wrap reveal">
+  <div class="eyebrow"><span class="tc">01</span> SELECTED WORK <span class="rule"></span></div>
+
+  <div class="filters" role="group" aria-label="작업물 분류">
+    <button class="chip" data-filter="all" aria-pressed="true">전체</button>
+    <button class="chip" data-filter="motion" aria-pressed="false">모션</button>
+    <button class="chip" data-filter="vfx" aria-pressed="false">시네마틱</button>
+    <!-- <button class="chip" data-filter="ai" aria-pressed="false">AI 작업</button> -->
+  </div>
+
+  <!-- ↓↓↓ 카드 하나를 복제해서 실제 작업물로 바꾸세요.
+       data-cat: motion / vfx / ai 중 하나  ·  썸네일은 .thumb 안에 <img>를 넣으면 됩니다 ↓↓↓ -->
+  <div class="grid" id="grid">
+<!--  href="https://www.youtube.com/watch?v=영상ID" target="_blank" -->
+    <a class="card" data-cat="motion" href="#" tabindex="0">
+      <div class="thumb"><img src="work1.png" alt="3D 애니메이션 작업" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;"><span class="cat-tag">MOTION</span><span class="play"></span></div>
+      <div class="meta"><h3>3D 애니메이션</h3>
+        <div class="sub mono"><span>3ds max</span><span>2026</span></div></div>
+    </a>
+
+    <a class="card" data-cat="vfx" href="#" tabindex="0">
+      <div class="thumb"><span class="cat-tag">VFX</span><span class="play"></span></div>
+      <div class="meta"><h3>시네마틱</h3>
+        <div class="sub mono"><span>3ds max · UE5</span><span>2026</span></div></div>
+    </a>
+
+    <!-- <a class="card" data-cat="ai" href="#" tabindex="0">
+      <div class="thumb"><span class="cat-tag">AI</span><span class="play"></span></div>
+      <div class="meta"><h3>생성형 AI 광고 콘텐츠</h3>
+        <div class="sub mono"><span>RUNWAY · AE</span><span>2025</span></div></div>
+    </a> -->
+
+    <!-- <a class="card" data-cat="motion" href="#" tabindex="0">
+      <div class="thumb"><span class="cat-tag">MOTION</span><span class="play"></span></div>
+      <div class="meta"><h3>방송 그래픽 패키지</h3>
+        <div class="sub mono"><span>BROADCAST</span><span>2023</span></div></div>
+    </a>
+
+    <a class="card" data-cat="vfx" href="#" tabindex="0">
+      <div class="thumb"><span class="cat-tag">VFX</span><span class="play"></span></div>
+      <div class="meta"><h3>합성 · 매트페인팅 리마스터</h3>
+        <div class="sub mono"><span>COMPOSITING</span><span>2023</span></div></div>
+    </a> -->
+<!-- 
+    <a class="card" data-cat="ai" href="#" tabindex="0">
+      <div class="thumb"><span class="cat-tag">AI</span><span class="play"></span></div>
+      <div class="meta"><h3>AI 스타일 트랜스퍼 실험</h3>
+        <div class="sub mono"><span>DIFFUSION</span><span>2024</span></div></div>
+    </a> -->
+
+  </div>
+</section>
+
+<!-- ══════════ ABOUT ══════════ -->
+<!-- <strong>약 3년</strong> -->
+<section id="about" class="wrap reveal">
+  <div class="eyebrow"><span class="tc">02</span> ABOUT <span class="rule"></span></div>
+  <div class="about">
+    <div>
+      <p>대학교 교육과정을 걸쳐 3D애니메이션을 만들어 왔습니다. 게임 시네마틱과 PV, 프레임 안에서 시선이 어떻게 흐르는지를 다뤄 온 시간이었습니다.</p>
+      <!-- <p>지금은 <strong>대학에서 가르침 받으며</strong>, 애니메이션 감각을 생성형 AI 도구와 연결하는 작업에 집중하고 있습니다. 도구가 바뀌어도 변하지 않는 것은 결국 <strong>무엇을, 왜 보여줄 것인가</strong>라는 판단이라고 믿습니다.</p> -->
+      <!-- <p>AI와 인문·윤리의 접점을 다룬 책 원고를 마무리했으며, 기술이 창작에 들어올 때 지켜야 할 태도에 대해 계속 이야기하고 있습니다.</p> -->
+    </div>
+    <div class="spec" aria-label="주요 정보">
+      <div class="row"><span class="k">FOCUS</span><span class="v">3D Animation</span></div>
+      <div class="row"><span class="k">TOOLS</span><span class="v">3ds max · Maya · UE5</span></div>
+      <!-- <div class="row"><span class="k">AI</span><span class="v">Runway · Diffusion</span></div> -->
+      <div class="row"><span class="k">EXP.</span><span class="v">3+ Years</span></div>
+      <div class="row"><span class="k">ROLE</span><span class="v">Creator </span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ CONTACT ══════════ -->
+<section id="contact" class="wrap contact reveal">
+  <div class="eyebrow"><span class="tc">03</span> CONTACT <span class="rule"></span></div>
+  <h2>함께 만들<br>이야기가 있다면.</h2>
+  <a class="mail" href="mailto:rkdgus1379@gmail.com">rkdgus1379@gmail.com</a>
+  <div class="links">
+    <a href="#">VIMEO</a><a href="#">YOUTUBE</a>
+    <a href="#">INSTAGRAM</a><a href="#">LINKEDIN</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span>© 2026 KIM KANGHYEOUN</span>
+    <span>3D Animation</span>
+  </div>
+</footer>
+
+<script>
+/* ── 작업물 필터 ── */
+const chips = document.querySelectorAll('.chip');
+const cards = document.querySelectorAll('#grid .card');
+chips.forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    chips.forEach(c=>c.setAttribute('aria-pressed','false'));
+    chip.setAttribute('aria-pressed','true');
+    const f = chip.dataset.filter;
+    cards.forEach(card=>{
+      card.style.display = (f==='all'||card.dataset.cat===f) ? '' : 'none';
+    });
+  });
+});
+
+/* ── 스크롤 진입 리빌 ── */
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
